@@ -13,7 +13,7 @@ Claude Code doesn't notify you when it finishes or needs permission. You tab awa
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tonyyont/peon-ping/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.sh | bash
 ```
 
 One command. Takes 10 seconds. macOS, WSL2 (Windows), and Linux. Re-run to update (sounds and config preserved).
@@ -21,7 +21,7 @@ One command. Takes 10 seconds. macOS, WSL2 (Windows), and Linux. Re-run to updat
 **Project-local install** — installs into `.claude/` in the current project instead of `~/.claude/`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tonyyont/peon-ping/main/install.sh | bash -s -- --local
+curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.sh | bash -s -- --local
 ```
 
 Local installs don't add the `peon` CLI alias or shell completions — use `/peon-ping-toggle` inside Claude Code instead.
