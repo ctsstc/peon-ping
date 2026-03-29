@@ -479,6 +479,135 @@ json.dump(cfg, open('$TEST_DIR/config.json', 'w'), indent=2)
 }
 
 # ============================================================
+# Themed overlay selection and position passthrough
+# ============================================================
+
+@test "themed overlay: glass theme selects mac-overlay-glass.js" {
+  _src_dir="$(cd "$(dirname "$PEON_SH")" && pwd)"
+  cp "$_src_dir/scripts/mac-overlay-glass.js" "$TEST_DIR/scripts/mac-overlay-glass.js"
+  python3 -c "
+import json
+cfg = json.load(open('$TEST_DIR/config.json'))
+cfg['overlay_theme'] = 'glass'
+json.dump(cfg, open('$TEST_DIR/config.json', 'w'), indent=2)
+"
+  run_peon '{"hook_event_name":"Stop","cwd":"/tmp/myproject","session_id":"s1","permission_mode":"default"}'
+  [ "$PEON_EXIT" -eq 0 ]
+  overlay_was_called
+  [[ "$(overlay_log)" == *"mac-overlay-glass.js"* ]]
+}
+
+@test "themed overlay: jarvis theme selects mac-overlay-jarvis.js" {
+  _src_dir="$(cd "$(dirname "$PEON_SH")" && pwd)"
+  cp "$_src_dir/scripts/mac-overlay-jarvis.js" "$TEST_DIR/scripts/mac-overlay-jarvis.js"
+  python3 -c "
+import json
+cfg = json.load(open('$TEST_DIR/config.json'))
+cfg['overlay_theme'] = 'jarvis'
+json.dump(cfg, open('$TEST_DIR/config.json', 'w'), indent=2)
+"
+  run_peon '{"hook_event_name":"Stop","cwd":"/tmp/myproject","session_id":"s1","permission_mode":"default"}'
+  [ "$PEON_EXIT" -eq 0 ]
+  overlay_was_called
+  [[ "$(overlay_log)" == *"mac-overlay-jarvis.js"* ]]
+}
+
+@test "themed overlay: sakura theme selects mac-overlay-sakura.js" {
+  _src_dir="$(cd "$(dirname "$PEON_SH")" && pwd)"
+  cp "$_src_dir/scripts/mac-overlay-sakura.js" "$TEST_DIR/scripts/mac-overlay-sakura.js"
+  python3 -c "
+import json
+cfg = json.load(open('$TEST_DIR/config.json'))
+cfg['overlay_theme'] = 'sakura'
+json.dump(cfg, open('$TEST_DIR/config.json', 'w'), indent=2)
+"
+  run_peon '{"hook_event_name":"Stop","cwd":"/tmp/myproject","session_id":"s1","permission_mode":"default"}'
+  [ "$PEON_EXIT" -eq 0 ]
+  overlay_was_called
+  [[ "$(overlay_log)" == *"mac-overlay-sakura.js"* ]]
+}
+
+@test "themed overlay: position passed to glass overlay" {
+  _src_dir="$(cd "$(dirname "$PEON_SH")" && pwd)"
+  cp "$_src_dir/scripts/mac-overlay-glass.js" "$TEST_DIR/scripts/mac-overlay-glass.js"
+  python3 -c "
+import json
+cfg = json.load(open('$TEST_DIR/config.json'))
+cfg['overlay_theme'] = 'glass'
+cfg['notification_position'] = 'bottom-left'
+json.dump(cfg, open('$TEST_DIR/config.json', 'w'), indent=2)
+"
+  run_peon '{"hook_event_name":"Stop","cwd":"/tmp/myproject","session_id":"s1","permission_mode":"default"}'
+  [ "$PEON_EXIT" -eq 0 ]
+  overlay_was_called
+  [[ "$(overlay_log)" == *"mac-overlay-glass.js"* ]]
+  [[ "$(overlay_log)" == *"bottom-left"* ]]
+}
+
+@test "themed overlay: position passed to jarvis overlay" {
+  _src_dir="$(cd "$(dirname "$PEON_SH")" && pwd)"
+  cp "$_src_dir/scripts/mac-overlay-jarvis.js" "$TEST_DIR/scripts/mac-overlay-jarvis.js"
+  python3 -c "
+import json
+cfg = json.load(open('$TEST_DIR/config.json'))
+cfg['overlay_theme'] = 'jarvis'
+cfg['notification_position'] = 'top-left'
+json.dump(cfg, open('$TEST_DIR/config.json', 'w'), indent=2)
+"
+  run_peon '{"hook_event_name":"Stop","cwd":"/tmp/myproject","session_id":"s1","permission_mode":"default"}'
+  [ "$PEON_EXIT" -eq 0 ]
+  overlay_was_called
+  [[ "$(overlay_log)" == *"mac-overlay-jarvis.js"* ]]
+  [[ "$(overlay_log)" == *"top-left"* ]]
+}
+
+@test "themed overlay: position passed to sakura overlay" {
+  _src_dir="$(cd "$(dirname "$PEON_SH")" && pwd)"
+  cp "$_src_dir/scripts/mac-overlay-sakura.js" "$TEST_DIR/scripts/mac-overlay-sakura.js"
+  python3 -c "
+import json
+cfg = json.load(open('$TEST_DIR/config.json'))
+cfg['overlay_theme'] = 'sakura'
+cfg['notification_position'] = 'bottom-center'
+json.dump(cfg, open('$TEST_DIR/config.json', 'w'), indent=2)
+"
+  run_peon '{"hook_event_name":"Stop","cwd":"/tmp/myproject","session_id":"s1","permission_mode":"default"}'
+  [ "$PEON_EXIT" -eq 0 ]
+  overlay_was_called
+  [[ "$(overlay_log)" == *"mac-overlay-sakura.js"* ]]
+  [[ "$(overlay_log)" == *"bottom-center"* ]]
+}
+
+@test "themed overlay: falls back to base overlay when themed file missing" {
+  # Set a theme but don't copy the themed overlay file
+  python3 -c "
+import json
+cfg = json.load(open('$TEST_DIR/config.json'))
+cfg['overlay_theme'] = 'glass'
+json.dump(cfg, open('$TEST_DIR/config.json', 'w'), indent=2)
+"
+  run_peon '{"hook_event_name":"Stop","cwd":"/tmp/myproject","session_id":"s1","permission_mode":"default"}'
+  [ "$PEON_EXIT" -eq 0 ]
+  overlay_was_called
+  # Should fall back to base overlay since glass file is not in scripts dir
+  [[ "$(overlay_log)" == *"mac-overlay.js"* ]]
+  ! [[ "$(overlay_log)" == *"mac-overlay-glass.js"* ]]
+}
+
+@test "themed overlay: invalid theme falls back to base overlay" {
+  python3 -c "
+import json
+cfg = json.load(open('$TEST_DIR/config.json'))
+cfg['overlay_theme'] = 'nonexistent'
+json.dump(cfg, open('$TEST_DIR/config.json', 'w'), indent=2)
+"
+  run_peon '{"hook_event_name":"Stop","cwd":"/tmp/myproject","session_id":"s1","permission_mode":"default"}'
+  [ "$PEON_EXIT" -eq 0 ]
+  overlay_was_called
+  [[ "$(overlay_log)" == *"mac-overlay.js"* ]]
+}
+
+# ============================================================
 # Configurable dismiss time (CLI)
 # ============================================================
 
