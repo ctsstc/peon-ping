@@ -1,8 +1,9 @@
 #!/usr/bin/env osascript -l JavaScript
 // mac-overlay.js — JXA Cocoa overlay notification for macOS
-// Usage: osascript -l JavaScript mac-overlay.js <message> <color> <icon_path> <slot> <dismiss_seconds> [bundle_id] [ide_pid] [session_tty] [subtitle] [position]
+// Usage: osascript -l JavaScript mac-overlay.js <message> <color> <icon_path> <slot> <dismiss_seconds> [bundle_id] [ide_pid] [session_tty] [subtitle] [position] [notify_type] [all_screens] [screen_index]
 //
-// Creates a borderless, always-on-top overlay on every screen.
+// Creates a borderless, always-on-top overlay. Shows on all screens by default,
+// or on a specific screen when screen_index is provided, or on the focused screen when all_screens=false.
 // Dismisses automatically after <dismiss_seconds> seconds (0 = persistent until clicked).
 // If bundle_id is provided, clicking the overlay activates that app (click-to-focus).
 // position: top-center (default), top-right, top-left, bottom-right, bottom-left, bottom-center
@@ -21,6 +22,8 @@ function run(argv) {
   var sessionTty = argv[7] || '';
   var subtitle    = argv[8] || '';
   var position    = argv[9] || 'top-center';
+  var allScreens  = argv[11] === 'true';
+  var screenIdx   = (argv[12] !== undefined && argv[12] !== '') ? parseInt(argv[12], 10) : -1;
 
   // Color map
   var r = 180/255, g = 0, b = 0;
@@ -37,6 +40,10 @@ function run(argv) {
   $.NSApp.setActivationPolicy($.NSApplicationActivationPolicyAccessory);
 
   var persistent = dismiss <= 0;
+
+  // Generate unique notification ID for all sibling overlays (all-screens mode)
+  // All overlays with the same slot will coordinate dismissal
+  var dismissNotificationName = 'com.peonping.dismiss.' + slot;
 
   // Register a click handler if we have a target bundle ID, IDE PID, or persistent mode
   var clickHandler = null;
@@ -64,7 +71,12 @@ function run(argv) {
               ]));
               task.launch;
               task.waitUntilExit;
-              $.NSApp.terminate(null);
+              // Signal ALL sibling overlays to dismiss (event-driven, no polling!)
+              $.NSDistributedNotificationCenter.defaultCenter.postNotificationNameObject($(dismissNotificationName), $.NSString.string);
+              // Small delay to ensure notification is delivered before we terminate
+          $.NSTimer.scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(
+            0.05, $.NSApp, 'terminate:', null, false
+          );
               return;
             }
             var activated = false;
@@ -90,7 +102,12 @@ function run(argv) {
                 ideApp.activateWithOptions($.NSApplicationActivateIgnoringOtherApps);
               }
             }
-            $.NSApp.terminate(null);
+            // Signal ALL sibling overlays to dismiss (event-driven, no polling!)
+            $.NSDistributedNotificationCenter.defaultCenter.postNotificationNameObject($(dismissNotificationName), $.NSString.string);
+            // Small delay to ensure notification is delivered before we terminate
+            $.NSTimer.scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(
+              0.05, $.NSApp, 'terminate:', null, false
+            );
           }
         }
       }
@@ -102,7 +119,29 @@ function run(argv) {
   var screenCount = screens.count;
   var windows = [];
 
-  for (var i = 0; i < screenCount; i++) {
+  // Determine which screen(s) to display on
+  var startIdx = 0, endIdx = screenCount;
+  if (screenIdx >= 0 && screenIdx < screenCount) {
+    // Specific screen requested (multi-process mode from notify.sh)
+    startIdx = screenIdx;
+    endIdx = screenIdx + 1;
+  } else if (!allScreens) {
+    // Single-screen mode: find screen where mouse cursor is
+    var mouseLocation = $.NSEvent.mouseLocation;
+    var focusedIdx = 0;
+    for (var s = 0; s < screenCount; s++) {
+      var scr = screens.objectAtIndex(s);
+      var sf = scr.frame;
+      if (mouseLocation.x >= sf.origin.x && mouseLocation.x <= sf.origin.x + sf.size.width &&
+          mouseLocation.y >= sf.origin.y && mouseLocation.y <= sf.origin.y + sf.size.height) {
+        focusedIdx = s; break;
+      }
+    }
+    startIdx = focusedIdx;
+    endIdx = focusedIdx + 1;
+  }
+
+  for (var i = startIdx; i < endIdx; i++) {
     var screen = screens.objectAtIndex(i);
     var visibleFrame = screen.visibleFrame;
 
@@ -240,6 +279,28 @@ function run(argv) {
       false
     );
   }
+
+  // Event-driven dismissal: observe distributed notifications from sibling overlays
+  // No polling! All overlays with the same slot will dismiss when any one is clicked.
+  ObjC.registerSubclass({
+    name: 'PeonDismissObserver',
+    superclass: 'NSObject',
+    methods: {
+      'handleDismiss:': {
+        types: ['void', ['id']],
+        implementation: function(notification) {
+          $.NSApp.terminate(null);
+        }
+      }
+    }
+  });
+  var observer = $.PeonDismissObserver.alloc.init;
+  $.NSDistributedNotificationCenter.defaultCenter.addObserverSelectorNameObject(
+    observer,
+    'handleDismiss:',
+    $(dismissNotificationName),
+    $.NSString.string
+  );
 
   $.NSApp.run;
 }
