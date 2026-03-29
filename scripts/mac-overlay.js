@@ -22,8 +22,7 @@ function run(argv) {
   var sessionTty = argv[7] || '';
   var subtitle    = argv[8] || '';
   var position    = argv[9] || 'top-center';
-  var allScreens  = argv[11] === 'true';
-  var screenIdx   = (argv[12] !== undefined && argv[12] !== '') ? parseInt(argv[12], 10) : -1;
+  var allScreens  = argv[11] !== 'false'; // default true
 
   // Color map
   var r = 180/255, g = 0, b = 0;
@@ -40,10 +39,6 @@ function run(argv) {
   $.NSApp.setActivationPolicy($.NSApplicationActivationPolicyAccessory);
 
   var persistent = dismiss <= 0;
-
-  // Generate unique notification ID for all sibling overlays (all-screens mode)
-  // All overlays with the same slot will coordinate dismissal
-  var dismissNotificationName = 'com.peonping.dismiss.' + slot;
 
   // Register a click handler if we have a target bundle ID, IDE PID, or persistent mode
   var clickHandler = null;
@@ -71,12 +66,7 @@ function run(argv) {
               ]));
               task.launch;
               task.waitUntilExit;
-              // Signal ALL sibling overlays to dismiss (event-driven, no polling!)
-              $.NSDistributedNotificationCenter.defaultCenter.postNotificationNameObject($(dismissNotificationName), $.NSString.string);
-              // Small delay to ensure notification is delivered before we terminate
-          $.NSTimer.scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(
-            0.05, $.NSApp, 'terminate:', null, false
-          );
+              $.NSApp.terminate(null);
               return;
             }
             var activated = false;
@@ -102,12 +92,7 @@ function run(argv) {
                 ideApp.activateWithOptions($.NSApplicationActivateIgnoringOtherApps);
               }
             }
-            // Signal ALL sibling overlays to dismiss (event-driven, no polling!)
-            $.NSDistributedNotificationCenter.defaultCenter.postNotificationNameObject($(dismissNotificationName), $.NSString.string);
-            // Small delay to ensure notification is delivered before we terminate
-            $.NSTimer.scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(
-              0.05, $.NSApp, 'terminate:', null, false
-            );
+            $.NSApp.terminate(null);
           }
         }
       }
@@ -121,11 +106,7 @@ function run(argv) {
 
   // Determine which screen(s) to display on
   var startIdx = 0, endIdx = screenCount;
-  if (screenIdx >= 0 && screenIdx < screenCount) {
-    // Specific screen requested (multi-process mode from notify.sh)
-    startIdx = screenIdx;
-    endIdx = screenIdx + 1;
-  } else if (!allScreens) {
+  if (!allScreens) {
     // Single-screen mode: find screen where mouse cursor is
     var mouseLocation = $.NSEvent.mouseLocation;
     var focusedIdx = 0;
@@ -279,28 +260,6 @@ function run(argv) {
       false
     );
   }
-
-  // Event-driven dismissal: observe distributed notifications from sibling overlays
-  // No polling! All overlays with the same slot will dismiss when any one is clicked.
-  ObjC.registerSubclass({
-    name: 'PeonDismissObserver',
-    superclass: 'NSObject',
-    methods: {
-      'handleDismiss:': {
-        types: ['void', ['id']],
-        implementation: function(notification) {
-          $.NSApp.terminate(null);
-        }
-      }
-    }
-  });
-  var observer = $.PeonDismissObserver.alloc.init;
-  $.NSDistributedNotificationCenter.defaultCenter.addObserverSelectorNameObject(
-    observer,
-    'handleDismiss:',
-    $(dismissNotificationName),
-    $.NSString.string
-  );
 
   $.NSApp.run;
 }
