@@ -445,7 +445,7 @@ function run(argv) {
   // ══════════════════════════════════════════════
   // CLICK-TO-DISMISS + focus correct window
   // ══════════════════════════════════════════════
-  ObjC.registerSubclass({
+  try { ObjC.registerSubclass({
     name: 'SakuraDismissHandler', superclass: 'NSObject',
     methods: { 'handleDismiss': { types: ['void', []], implementation: function() {
       // iTerm2: raise the specific window containing our session
@@ -483,7 +483,7 @@ function run(argv) {
       }
       $.NSApp.terminate(null);
     }}}
-  });
+  }); } catch(e) {}
   var dh = $.SakuraDismissHandler.alloc.init;
   var btn = $.NSButton.alloc.initWithFrame($.NSMakeRect(0, 0, winW, winH));
   btn.setTitle($('')); btn.setBordered(false); btn.setTransparent(true);
@@ -500,7 +500,7 @@ function run(argv) {
     var animSteps = 120, animInterval = dismiss / animSteps;
     var step = { val: 0 };
 
-    ObjC.registerSubclass({
+    try { ObjC.registerSubclass({
       name: 'SakuraAnimator', superclass: 'NSObject',
       methods: { 'tick:': { types: ['void', ['id']], implementation: function(timer) {
         step.val++;
@@ -535,7 +535,7 @@ function run(argv) {
           win.orderOut(null);
         }
       }}}
-    });
+    }); } catch(e) {}
 
     var anim = $.SakuraAnimator.alloc.init;
     $.NSTimer.scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(

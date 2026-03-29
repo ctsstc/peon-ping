@@ -43,7 +43,7 @@ function run(argv) {
   // Register a click handler if we have a target bundle ID, IDE PID, or persistent mode
   var clickHandler = null;
   if (bundleId || idePid > 0 || persistent) {
-    ObjC.registerSubclass({
+    try { ObjC.registerSubclass({
       name: 'PeonClickHandler',
       superclass: 'NSObject',
       methods: {
@@ -96,7 +96,7 @@ function run(argv) {
           }
         }
       }
-    });
+    }); } catch(e) {}
     clickHandler = $.PeonClickHandler.alloc.init;
   }
 
